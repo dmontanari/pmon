@@ -10,7 +10,7 @@
 #include <string.h>
 
 
-unsigned long get_statfile_size(const char *filename)
+unsigned long get_proc_filesize(const char *filename)
 {
     struct stat stt;
     int         ret;
@@ -47,6 +47,36 @@ unsigned long get_statfile_size(const char *filename)
     
 }
 
+
+char *read_procfile(const char *filename)
+{
+
+    unsigned long file_size = get_proc_filesize(filename);
+
+    if (file_size == 0)
+        return 0;
+
+    char *bfr = (char *)malloc(file_size+1);
+    memset(bfr, 0, file_size+1);
+    if (bfr == NULL)
+    {
+        fprintf(stderr, "Memory allocation error: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    int fd = open(filename, O_RDONLY);
+    if ( fd < 0 )
+    {
+        printf("Impossible to open file %s : %s", filename, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    read(fd, bfr, file_size);
+
+    return bfr;
+}
+
+
 void monitore(char *pid)
 {
 
@@ -54,37 +84,11 @@ void monitore(char *pid)
     unsigned long   stat_size = 0;
     int             ret = 0;
 
-    // TODO: Protect from buffer overflow
     sprintf(filename, "/proc/%s/stat", pid);
-
-    stat_size = get_statfile_size(filename);
-    if ( stat_size < 0)
-    {
-        fprintf(stderr, "Impossible to open %s : %s\n", filename, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    // File exist, try open
-    int fd = open(filename, O_RDONLY);
-    if ( -1 == fd )
-    {
-        fprintf(stderr, "Impossible to open file %s : %s", filename, strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    // file is open, read field #22 (process starttime)
-    char *aux = NULL;
-
-    // stat stt.st_size return 0 bytes for /proc files...
-    char *bfr = (char *)malloc(stat_size);
-    memset(bfr, 0, stat_size);
-    ret = read(fd, bfr, stat_size);
-    close(fd);
-
-    printf("-----------------------\n%s\n----------------------\n", bfr);
+    char *bfr = read_procfile(filename);
 
     // Jump 21 fields
-    aux = bfr;
+    char *aux = bfr;
     int i = 0;
     do
     {
@@ -95,9 +99,18 @@ void monitore(char *pid)
 
     unsigned long start_time = atoi(aux);
 
-    printf("We have %s (%lu)\n", aux, start_time);
+    printf("Program started at %lu\n", start_time / sysconf(_SC_CLK_TCK));
 
-    exit(EXIT_SUCCESS);
+    char *up_bfr = read_procfile("/proc/uptime");
+    printf("uptime: %s\n", up_bfr);
+
+    /*
+seconds = seconds_since_boot - buf->start_time / sysconf(_SC_CLK_TCK);
+  if(seconds) pcpu = (used_jiffies * 1000ULL / Hertz) / seconds;
+
+
+    */
+
 
     if ( -1 == ret )
     {
@@ -105,7 +118,7 @@ void monitore(char *pid)
         exit(EXIT_FAILURE);
     }
 
-    while ( get_statfile_size(filename) >= 0 )
+    while ( get_proc_filesize(filename) >= 0 )
     {
         sleep(1);
     }
