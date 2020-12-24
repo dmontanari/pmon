@@ -8,9 +8,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
-
-unsigned long get_proc_filesize(const char *filename)
+long get_proc_filesize(const char *filename)
 {
     struct stat stt;
     int         ret;
@@ -77,6 +77,23 @@ char *read_procfile(const char *filename)
 }
 
 
+double uptime()
+{
+    double  up      = 0, 
+            idle    = 0;
+    char    *up_bfr = read_procfile("/proc/uptime");
+    
+    printf("uptime: %s\n", up_bfr);
+    if (sscanf(up_bfr, "%lf %lf", &up, &idle) < 2)
+    {
+        fprintf(stderr, "Conversion error: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    free(up_bfr);
+
+    return up;
+}
+
 void monitore(char *pid)
 {
 
@@ -97,35 +114,19 @@ void monitore(char *pid)
         aux++;
     } while ( i<21 && aux < (bfr+1024) );
 
-    unsigned long start_time = atoi(aux);
+    free(bfr);
 
-    printf("Program started at %lu\n", start_time / sysconf(_SC_CLK_TCK));
+    unsigned long start_time = atol(aux)  / sysconf(_SC_CLK_TCK);
 
-    char *up_bfr = read_procfile("/proc/uptime");
-    printf("uptime: %s\n", up_bfr);
-
-    /*
-seconds = seconds_since_boot - buf->start_time / sysconf(_SC_CLK_TCK);
-  if(seconds) pcpu = (used_jiffies * 1000ULL / Hertz) / seconds;
-
-
-    */
-
-
-    if ( -1 == ret )
-    {
-        fprintf(stderr, "Impossible to read stat file : %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
+    printf("Program started at %lu\n", start_time);
     while ( get_proc_filesize(filename) >= 0 )
     {
         sleep(1);
     }
 
-    printf("Process finished or die.\n");
+    unsigned long total = uptime() - start_time;
 
-    // Process die, do the math and print time
+    printf("Process run for %lu seconds.\n", total);
 
 }
 
