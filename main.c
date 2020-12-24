@@ -10,6 +10,25 @@
 #include <string.h>
 #include <time.h>
 
+struct running_time {
+
+    unsigned long days;
+    char hours;
+    char minutes;
+    char seconds;
+
+};
+
+
+void to_running_time(struct running_time *rt, unsigned long seconds)
+{
+    rt->days = ( seconds / 3600 / 24 );
+    rt->hours = ( seconds / 3600 % 24 );
+    rt->minutes = (seconds / 60 % 60);
+    rt->seconds = (seconds % 60);
+}
+
+
 long get_proc_filesize(const char *filename)
 {
     struct stat stt;
@@ -33,7 +52,7 @@ long get_proc_filesize(const char *filename)
         exit(EXIT_FAILURE);
     }
 
-    // file is open, read field #22 (process starttime)
+    // file is open, read field #22 (process starttime - see man proc)
     char aux;
     int count = 0;
 
@@ -67,7 +86,7 @@ char *read_procfile(const char *filename)
     int fd = open(filename, O_RDONLY);
     if ( fd < 0 )
     {
-        printf("Impossible to open file %s : %s", filename, strerror(errno));
+        fprintf(stderr, "Impossible to open file %s : %s", filename, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
@@ -83,7 +102,6 @@ double uptime()
             idle    = 0;
     char    *up_bfr = read_procfile("/proc/uptime");
     
-    printf("uptime: %s\n", up_bfr);
     if (sscanf(up_bfr, "%lf %lf", &up, &idle) < 2)
     {
         fprintf(stderr, "Conversion error: %s", strerror(errno));
@@ -118,15 +136,17 @@ void monitore(char *pid)
 
     unsigned long start_time = atol(aux)  / sysconf(_SC_CLK_TCK);
 
-    printf("Program started at %lu\n", start_time);
     while ( get_proc_filesize(filename) >= 0 )
     {
         sleep(1);
     }
 
     unsigned long total = uptime() - start_time;
+    struct running_time rt;
 
-    printf("Process run for %lu seconds.\n", total);
+    to_running_time(&rt, total);
+
+    printf("Process run for %lu days, %d:%d:%d\n", rt.days, rt.hours, rt.minutes, rt.seconds);
 
 }
 
@@ -138,6 +158,7 @@ int main(int argc, char **argv) {
     char    *pid = NULL;
     char    mon_time = 0;
 
+    // TODO : What else can be monitored ?
     while ( (opt = getopt(argc, argv, "p:t")) != -1 )
     {
         switch (opt)
@@ -159,7 +180,7 @@ int main(int argc, char **argv) {
 
     if ( NULL == pid || !mon_time )
     {
-        fprintf(stderr, "Use %s -p pid\n", argv[0]);
+        fprintf(stderr, "Use %s -p pid -t\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
