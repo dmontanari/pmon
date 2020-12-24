@@ -150,16 +150,26 @@ void monitore(char *pid)
 
 }
 
+void help()
+{
+    printf("\t\t. : Process Monitor : .\n");
+    printf("For when you forget to \"time\" executions.\n");
+    printf("Usage:\n");
+    printf("-p [pid] : Process ID\n");
+    printf("-t : Get time stat\n");
 
+    printf("\n\n");
+    exit(EXIT_SUCCESS);
+}
 
 int main(int argc, char **argv) {
 
     int     opt;
     char    *pid = NULL;
-    char    mon_time = 0;
+    char    mon_time = 1;
 
     // TODO : What else can be monitored ?
-    while ( (opt = getopt(argc, argv, "p:t")) != -1 )
+    while ( (opt = getopt(argc, argv, "p:th")) != -1 )
     {
         switch (opt)
         {
@@ -171,6 +181,10 @@ int main(int argc, char **argv) {
         case 't':
             // Monitore execution time
             mon_time = 1;
+            break;
+
+        case 'h':
+            help();
             break;
         
         default:
