@@ -10,7 +10,7 @@
 #include <string.h>
 
 
-char get_statfile_size(const char *filename)
+unsigned long get_statfile_size(const char *filename)
 {
     struct stat stt;
     int         ret;
@@ -23,16 +23,36 @@ char get_statfile_size(const char *filename)
         return -1;
     }
 
-    return stt.st_size;
+    // stat.st_size return 0 bytes for files in /proc
+    // Read byte by byte and count
+    // File exist, try open
+    int fd = open(filename, O_RDONLY);
+    if ( -1 == fd )
+    {
+        fprintf(stderr, "Impossible to open file %s : %s", filename, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    // file is open, read field #22 (process starttime)
+    char aux;
+    int count = 0;
+
+    while ( read(fd, &aux, 1) == 1)
+        count++;
+
+    close(fd);
+
+
+    return count;
     
 }
 
 void monitore(char *pid)
 {
 
-    char    filename[255];
-    int     stat_size = 0;
-    int     ret = 0;
+    char            filename[255];
+    unsigned long   stat_size = 0;
+    int             ret = 0;
 
     // TODO: Protect from buffer overflow
     sprintf(filename, "/proc/%s/stat", pid);
@@ -56,9 +76,9 @@ void monitore(char *pid)
     char *aux = NULL;
 
     // stat stt.st_size return 0 bytes for /proc files...
-    char bfr[1024];
-    memset(bfr, 0, 1024);
-    ret = read(fd, bfr, 1024);
+    char *bfr = (char *)malloc(stat_size);
+    memset(bfr, 0, stat_size);
+    ret = read(fd, bfr, stat_size);
     close(fd);
 
     printf("-----------------------\n%s\n----------------------\n", bfr);
