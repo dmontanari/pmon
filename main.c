@@ -10,7 +10,7 @@
 #include <string.h>
 
 
-char stat_file_exist(const char *filename)
+char get_statfile_size(const char *filename)
 {
     struct stat stt;
     int         ret;
@@ -18,21 +18,29 @@ char stat_file_exist(const char *filename)
     // TODO: Check all possible return errors
     ret = stat(filename, &stt);
     
-    return ( ret == 0 );
+    if ( 0 != ret )
+    {
+        return -1;
+    }
+
+    return stt.st_size;
     
 }
 
 void monitore(char *pid)
 {
 
-    char filename[255];
+    char    filename[255];
+    int     stat_size = 0;
+    int     ret = 0;
 
     // TODO: Protect from buffer overflow
     sprintf(filename, "/proc/%s/stat", pid);
 
-    if ( !stat_file_exist(filename))
+    stat_size = get_statfile_size(filename);
+    if ( stat_size < 0)
     {
-        printf("Impossible to open %s : %s\n", filename, strerror(errno));
+        fprintf(stderr, "Impossible to open %s : %s\n", filename, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
@@ -40,19 +48,49 @@ void monitore(char *pid)
     int fd = open(filename, O_RDONLY);
     if ( -1 == fd )
     {
-        printf("Impossible to open file %s : %s", filename, strerror(errno));
+        fprintf(stderr, "Impossible to open file %s : %s", filename, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     // file is open, read field #22 (process starttime)
-    char bfr[512];
+    char *aux = NULL;
 
-    memset(bfr, 0, sizeof(bfr));
+    // stat stt.st_size return 0 bytes for /proc files...
+    char bfr[1024];
+    memset(bfr, 0, 1024);
+    ret = read(fd, bfr, 1024);
+    close(fd);
 
-    while ( stat_file_exist(filename) ) 
+    printf("-----------------------\n%s\n----------------------\n", bfr);
+
+    // Jump 21 fields
+    aux = bfr;
+    int i = 0;
+    do
+    {
+        if ( *aux == ' ')
+            i++;
+        aux++;
+    } while ( i<21 && aux < (bfr+1024) );
+
+    unsigned long start_time = atoi(aux);
+
+    printf("We have %s (%lu)\n", aux, start_time);
+
+    exit(EXIT_SUCCESS);
+
+    if ( -1 == ret )
+    {
+        fprintf(stderr, "Impossible to read stat file : %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    while ( get_statfile_size(filename) >= 0 )
     {
         sleep(1);
     }
+
+    printf("Process finished or die.\n");
 
     // Process die, do the math and print time
 
